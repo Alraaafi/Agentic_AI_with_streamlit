@@ -1,0 +1,10 @@
+agno
+streamlit
+python-dotenv
+google-genai
+youtube-transcript-api
+yfinance
+duckduckgo-search
+groq
+openai
+rich

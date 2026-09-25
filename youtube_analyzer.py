@@ -1,56 +1,64 @@
+import os
+import re
+from dataclasses import dataclass
 from textwrap import dedent
+
 from dotenv import load_dotenv
-from agno.agent import Agent
-from agno.models.openai import OpenAIResponses
-from agno.tools.youtube import YouTubeTools
+from google import genai
+from youtube_transcript_api import YouTubeTranscriptApi
 
 load_dotenv()
 
-def build_youtube_agent():
-    return Agent(
-        name="YouTube Agent",
-        model=OpenAIResponses(id="gpt-5.2"),
-        tools=[YouTubeTools()],
-        instructions=dedent("""\
+
+@dataclass
+class AgentResponse:
+    content: str
+
+
+class YouTubeAgent:
+    def __init__(self):
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GOOGLE_API_KEY is missing from the .env file.")
+
+        self.client = genai.Client(api_key=api_key)
+        self.model = "gemini-2.5-flash"
+        self.instructions = dedent("""\
             You are an expert YouTube content analyst with a keen eye for detail! 🎓
-            Follow these steps for comprehensive video analysis:
-            1. Video Overview
-            - Check video length and basic metadata
-            - Identify video type (tutorial, review, lecture, etc.)
-            - Note the content structure
-            2. Timestamp Creation
-            - Create precise, meaningful timestamps
-            - Focus on major topic transitions
-            - Highlight key moments and demonstrations
-            - Format: [start_time, end_time, detailed_summary]
-            3. Content Organization
-            - Group related segments
-            - Identify main themes
-            - Track topic progression
+            Analyze the supplied transcript and produce a clear, accurate report.
+            Include a video overview, meaningful timestamped sections when timestamps
+            are available, major themes, key learning points, demonstrations, and
+            important references. Avoid inventing details not present in the transcript.
+            Use markdown and relevant emojis for educational, technical, gaming,
+            technology-review, and creative content.
+        """)
 
-            Your analysis style:
-            - Begin with a video overview
-            - Use clear, descriptive segment titles
-            - Include relevant emojis for content types:
-            📚 Educational
-            💻 Technical
-            🎮 Gaming
-            📱 Tech Review
-            🎨 Creative
-            - Highlight key learning points
-            - Note practical demonstrations
-            - Mark important references
+    @staticmethod
+    def _video_id(video_url: str) -> str:
+        match = re.search(
+            r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|embed/))([^?&/]+)",
+            video_url,
+        )
+        if not match:
+            raise ValueError("Please enter a valid YouTube URL.")
+        return match.group(1)
 
-            Quality Guidelines:
-            - Verify timestamp accuracy
-            - Avoid timestamp hallucination
-            - Ensure comprehensive coverage
-            - Maintain consistent detail level
-            - Focus on valuable content markers
-        """),
-        add_datetime_to_context=True,
-        markdown=True,
-    )
+    def run(self, prompt: str) -> AgentResponse:
+        video_url = prompt.removeprefix("Analyze this video:").strip()
+        video_id = self._video_id(video_url)
+        transcript = YouTubeTranscriptApi().fetch(video_id)
+        transcript_text = "\n".join(
+            f"[{item.start:.0f}s] {item.text}" for item in transcript
+        )
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=f"{self.instructions}\n\nTranscript:\n{transcript_text}",
+        )
+        return AgentResponse(content=response.text or "Gemini returned an empty response.")
+
+
+def build_youtube_agent():
+    return YouTubeAgent()
 
 # youtube_agent.print_response(
 #     "Analyze this video: https://www.youtube.com/watch?v=JkaxUblCGz0",
