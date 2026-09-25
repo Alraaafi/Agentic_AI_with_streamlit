@@ -19,7 +19,14 @@ class YouTubeAgent:
     def __init__(self):
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise RuntimeError("GOOGLE_API_KEY is missing from the .env file.")
+            raise RuntimeError(
+                "A Gemini API key is missing. Add GOOGLE_API_KEY to the .env file."
+            )
+        if api_key.startswith("AQ."):
+            raise RuntimeError(
+                "The configured credential is an OAuth access token. "
+                "Use a Google AI Studio Gemini API key instead; it usually starts with AIza."
+            )
 
         self.client = genai.Client(api_key=api_key)
         self.model = "gemini-2.5-flash"
