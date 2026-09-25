@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from google import genai
 from youtube_transcript_api import YouTubeTranscriptApi
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 @dataclass
@@ -18,7 +18,7 @@ class AgentResponse:
 class YouTubeAgent:
     def __init__(self):
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
+        if not api_key or api_key.startswith("replace_with_"):
             raise RuntimeError(
                 "A Gemini API key is missing. Add GOOGLE_API_KEY to the .env file."
             )
